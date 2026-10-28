@@ -1,0 +1,89 @@
+.pv-stats {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr 1fr;
+  margin-top: 30px;
+  border: 1px solid var(--pv-line);
+  border-radius: var(--pv-radius);
+  background: var(--pv-surface-glass);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+
+.pv-stat {
+  position: relative;
+  padding: 18px 20px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  border-left: 1px solid var(--pv-line);
+  overflow: hidden;
+  transition: background .3s;
+}
+
+.pv-stat:first-child {
+  border-left: 0;
+}
+
+.pv-stat:hover {
+  background: var(--pv-surface-2);
+}
+
+.pv-stat > span {
+  font-family: var(--pv-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--pv-muted);
+}
+
+.pv-stat b {
+  position: relative;
+  z-index: 1;
+  font-family: var(--pv-mono);
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pv-spark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 46px;
+  opacity: 0;
+  transition: opacity .5s;
+}
+
+.pv-stats.is-live .pv-spark {
+  opacity: 1;
+}
+
+.pv-spark-line {
+  fill: none;
+  stroke: var(--pv-accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.pv-spark-area {
+  fill: var(--pv-accent-soft);
+}
+
+@media (max-width: 760px) {
+  .pv-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pv-stat:nth-child(3) {
+    border-left: 0;
+  }
+
+  .pv-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--pv-line);
+  }
+}
+

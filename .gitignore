@@ -1,0 +1,8 @@
+*.astraplugin
+target/
+data/
+endpoints.local.json
+
+CHATS.md
+AGENTS.md
+CLAUDE.md

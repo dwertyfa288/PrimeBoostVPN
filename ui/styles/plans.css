@@ -1,0 +1,441 @@
+.pv-balance {
+  margin-left: auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--pv-line-strong);
+  background: var(--pv-surface-glass);
+  font-family: var(--pv-mono);
+  font-size: 12px;
+  animation: pv-pop .4s var(--pv-spring) both;
+}
+
+.pv-balance b {
+  color: var(--pv-accent);
+  font-weight: 600;
+}
+
+.pv-current {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding: 14px 18px;
+  border-radius: var(--pv-radius-sm);
+  border: 1px solid color-mix(in srgb, var(--pv-ok) 35%, transparent);
+  background: color-mix(in srgb, var(--pv-ok) 10%, transparent);
+}
+
+.pv-current div {
+  display: grid;
+  gap: 2px;
+}
+
+.pv-current small {
+  color: var(--pv-muted);
+  font-size: 13px;
+}
+
+.pv-current-dot {
+  position: relative;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pv-ok);
+}
+
+.pv-current-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: pv-ping-dot 2s var(--pv-ease) infinite;
+}
+
+.pv-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.pv-plan {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 22px;
+  border-radius: var(--pv-radius);
+  border: 1px solid var(--pv-line);
+  background: var(--pv-surface-glass);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+  animation: pv-rise .6s var(--pv-ease) both;
+  animation-delay: var(--d, 0ms);
+  transition: transform .35s var(--pv-spring), border-color .3s, box-shadow .35s;
+}
+
+.pv-plan:hover {
+  transform: translateY(-4px);
+  border-color: var(--pv-line-strong);
+  box-shadow: var(--pv-shadow);
+}
+
+.pv-plan.is-featured {
+  border-color: var(--pv-accent);
+  background:
+    radial-gradient(circle at 100% 0%, var(--pv-accent-soft), transparent 60%),
+    var(--pv-surface-glass);
+}
+
+.pv-plan.is-featured::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--pv-angle, 0deg), transparent 0 70%, var(--pv-accent-2) 85%, transparent);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: pv-border-spin 5s linear infinite;
+  pointer-events: none;
+}
+
+.pv-plan-top {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pv-plan-term {
+  font-family: var(--pv-mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--pv-muted);
+}
+
+.pv-badge {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, var(--pv-accent), var(--pv-accent-2));
+  color: var(--pv-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pv-plan h3 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: -.02em;
+}
+
+.pv-price {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.pv-price b {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -.04em;
+  line-height: 1;
+}
+
+.pv-price span {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--pv-muted);
+}
+
+.pv-plan small {
+  font-size: 13px;
+  color: var(--pv-muted);
+}
+
+.pv-plan .pv-primary {
+  margin-top: 4px;
+  padding: 13px 16px;
+  font-size: 14px;
+}
+
+.pv-plan:not(.is-featured) .pv-primary {
+  background: var(--pv-surface-2);
+  color: var(--pv-text);
+  box-shadow: none;
+  border: 1px solid var(--pv-line-strong);
+}
+
+.pv-plan:not(.is-featured) .pv-primary:hover {
+  border-color: var(--pv-accent);
+}
+
+.pv-plan-skeleton {
+  min-height: 210px;
+  background: linear-gradient(100deg, var(--pv-surface-2) 30%, var(--pv-surface) 50%, var(--pv-surface-2) 70%);
+  background-size: 300% 100%;
+  animation: pv-skeleton 1.4s linear infinite;
+}
+
+.pv-sub-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border-radius: var(--pv-radius-sm);
+  border: 1px solid var(--pv-line);
+  background: var(--pv-surface-glass);
+  font-size: 14px;
+  color: var(--pv-muted);
+  text-align: left;
+  transition: border-color .25s, transform .3s var(--pv-spring);
+}
+
+.pv-sub-chip span:nth-child(2) {
+  flex: 1;
+}
+
+.pv-sub-chip b {
+  color: var(--pv-accent);
+  font-size: 13px;
+}
+
+.pv-sub-chip:hover {
+  border-color: var(--pv-accent);
+  transform: translateY(-1px);
+}
+
+.pv-checkout {
+  width: min(440px, 100%);
+}
+
+.pv-checkout-title {
+  display: grid;
+  gap: 2px;
+}
+
+.pv-checkout-title small {
+  font-family: var(--pv-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--pv-muted);
+}
+
+.pv-checkout-title b {
+  font-size: 18px;
+}
+
+.pv-checkout-step {
+  display: none;
+  gap: 14px;
+}
+
+.pv-checkout-step.is-active {
+  display: grid;
+  animation: pv-rise .4s var(--pv-ease) both;
+}
+
+.pv-center {
+  justify-items: center;
+  text-align: center;
+}
+
+.pv-methods {
+  display: grid;
+  gap: 8px;
+}
+
+.pv-methods button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: var(--pv-radius-sm);
+  border: 1px solid var(--pv-line-strong);
+  background: var(--pv-surface-2);
+  text-align: left;
+  transition: border-color .2s, background .2s, transform .25s var(--pv-spring);
+}
+
+.pv-methods button .pv-method-icon {
+  grid-row: span 2;
+}
+
+.pv-methods button small {
+  font-size: 12px;
+  color: var(--pv-muted);
+}
+
+.pv-methods button:hover:not(:disabled) {
+  transform: translateX(3px);
+}
+
+.pv-methods button.is-active {
+  border-color: var(--pv-accent);
+  background: var(--pv-accent-soft);
+}
+
+.pv-methods button:disabled {
+  opacity: .45;
+}
+
+.pv-method-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--pv-surface);
+  color: var(--pv-accent);
+}
+
+.pv-method-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pv-method-icon-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--pv-accent-soft);
+}
+
+.pv-method-icon-lg svg {
+  width: 30px;
+  height: 30px;
+}
+
+.pv-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 4px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--pv-line);
+  color: var(--pv-muted);
+  font-size: 14px;
+}
+
+.pv-total b {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--pv-text);
+  letter-spacing: -.02em;
+}
+
+.pv-total-inline {
+  gap: 10px;
+  border: 0;
+  padding: 0;
+}
+
+.pv-big-spinner {
+  width: 54px;
+  height: 54px;
+  margin: 18px 0 4px;
+  border-radius: 50%;
+  border: 3px solid var(--pv-line-strong);
+  border-top-color: var(--pv-accent);
+  animation: pv-spin .8s linear infinite;
+}
+
+.pv-qr {
+  padding: 12px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 50px -24px var(--pv-accent);
+  animation: pv-pop .5s var(--pv-spring) both;
+}
+
+.pv-qr img {
+  display: block;
+  width: 210px;
+  height: 210px;
+  image-rendering: pixelated;
+}
+
+.pv-qr-text {
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--pv-surface-2);
+  font-family: var(--pv-mono);
+  font-size: 11px;
+  color: var(--pv-muted);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.pv-waiting-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--pv-muted);
+}
+
+.pv-waiting-line .pv-dots {
+  padding-top: 0;
+}
+
+.pv-success {
+  width: 84px;
+  height: 84px;
+  margin-top: 8px;
+  fill: none;
+  stroke: var(--pv-ok);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pv-success circle {
+  stroke-dasharray: 151;
+  animation: pv-draw-circle .7s var(--pv-ease) both;
+}
+
+.pv-success path {
+  stroke-dasharray: 36;
+  animation: pv-draw-check .45s var(--pv-ease) .55s both;
+}
+
+.pv-success-title {
+  font-size: 20px;
+  letter-spacing: -.02em;
+}
+
+@keyframes pv-draw-circle {
+  from {
+    stroke-dashoffset: 151;
+  }
+}
+
+@keyframes pv-draw-check {
+  from {
+    stroke-dashoffset: 36;
+  }
+}
+
+@keyframes pv-skeleton {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}

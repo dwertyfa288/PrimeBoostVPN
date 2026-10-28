@@ -1,0 +1,183 @@
+@property --pv-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.pv-view:not([hidden]) .pv-reveal {
+  animation: pv-rise .7s var(--pv-ease) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.pv-view:not([hidden]) .pv-line-in {
+  animation: pv-line-up .9s var(--pv-ease) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.pv-swap {
+  display: inline-block;
+}
+
+.pv-line-in.pv-swap {
+  display: block;
+}
+
+.pv-swap.is-swapping {
+  animation: pv-swap-in .5s var(--pv-ease) both !important;
+}
+
+.pv-shine-text {
+  background: linear-gradient(100deg, var(--pv-accent) 0 40%, var(--pv-accent-2) 50%, var(--pv-accent) 60% 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: pv-line-up .9s var(--pv-ease) both, pv-shine 5s linear 1s infinite !important;
+  animation-delay: var(--d, 0ms), 1s !important;
+}
+
+@keyframes pv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes pv-line-up {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+@keyframes pv-swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(40%);
+    filter: blur(6px);
+  }
+}
+
+@keyframes pv-shine {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+@keyframes pv-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+}
+
+@keyframes pv-pop {
+  from {
+    opacity: 0;
+    transform: scale(.85);
+  }
+}
+
+@keyframes pv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pv-border-spin {
+  to {
+    --pv-angle: 360deg;
+  }
+}
+
+@keyframes pv-ping-dot {
+  from {
+    opacity: .7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+@keyframes pv-wave {
+  from {
+    opacity: .7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.75);
+  }
+}
+
+@keyframes pv-burst {
+  from {
+    opacity: .55;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+@keyframes pv-breathe {
+  50% {
+    transform: scale(.95);
+  }
+}
+
+@keyframes pv-idle {
+  50% {
+    box-shadow: inset 0 -10px 24px #0000002e, 0 20px 40px -24px #000, 0 0 0 8px var(--pv-accent-soft);
+  }
+}
+
+@keyframes pv-bar {
+  50% {
+    opacity: .45;
+  }
+}
+
+@keyframes pv-dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: .4;
+  }
+  40% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+@keyframes pv-bob {
+  50% {
+    transform: translateY(-4px) rotate(-4deg);
+  }
+}
+
+@keyframes pv-shake {
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

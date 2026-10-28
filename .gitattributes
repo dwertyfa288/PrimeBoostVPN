@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.dat binary
+*.srs binary
+*.exe binary
+*.dll binary
+*.png binary
+core/linux/* binary

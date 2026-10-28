@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <script src="http://astra-plugin.localhost/bridge/astra-bridge.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeBoost VPN</title>
+  <link rel="stylesheet" href="styles/tokens.css" />
+  <link rel="stylesheet" href="styles/backdrop.css" />
+  <link rel="stylesheet" href="styles/layout.css" />
+  <link rel="stylesheet" href="styles/controls.css" />
+  <link rel="stylesheet" href="styles/auth.css" />
+  <link rel="stylesheet" href="styles/power.css" />
+  <link rel="stylesheet" href="styles/stats.css" />
+  <link rel="stylesheet" href="styles/settings.css" />
+  <link rel="stylesheet" href="styles/plans.css" />
+  <link rel="stylesheet" href="styles/coverage.css" />
+  <link rel="stylesheet" href="styles/motion.css" />
+</head>
+<body data-pv-theme="dark">
+  <main class="pv">
+    <div class="pv-backdrop" aria-hidden="true">
+      <div class="pv-grid"></div>
+      <div class="pv-glow pv-glow-a"></div>
+      <div class="pv-glow pv-glow-b"></div>
+      <div class="pv-beam"></div>
+    </div>
+
+    <header class="pv-top">
+      <div class="pv-brand">
+        <svg class="pv-mark" viewBox="0 0 36 36" aria-hidden="true"><g transform="translate(8 2) skewX(-20)"><rect x="0" y="7" width="7" height="22" rx="2" /><rect x="11" y="0" width="7" height="32" rx="2" /><rect x="22" y="7" width="7" height="22" rx="2" /></g></svg>
+        <span class="pv-word"><b>Prime</b>Boost</span>
+      </div>
+      <div class="pv-account" id="account" hidden>
+        <span class="pv-avatar" id="account-avatar"></span>
+        <span class="pv-account-mail" id="account-email"></span>
+        <button class="pv-icon-btn" id="open-home" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7" /><path d="M6 9.5V20h12V9.5" /><path d="M10 20v-5h4v5" /></svg>
+          <span data-i18n="home"></span>
+        </button>
+        <button class="pv-icon-btn" id="open-plans" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18" /><path d="M7 15h3" /></svg>
+          <span data-i18n="plans"></span>
+        </button>
+        <button class="pv-icon-btn" id="open-settings" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10" /><path d="M18 7h2" /><circle cx="16" cy="7" r="2" /><path d="M4 17h4" /><path d="M12 17h8" /><circle cx="10" cy="17" r="2" /></svg>
+          <span data-i18n="settings"></span>
+        </button>
+        <button class="pv-icon-btn" id="logout" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l5-5-5-5" /><path d="M15 12H4" /></svg>
+          <span data-i18n="logout"></span>
+        </button>
+      </div>
+    </header>
+
+    <section class="pv-view" id="view-loading">
+      <div class="pv-loading">
+        <svg class="pv-mark pv-mark-loading" viewBox="0 0 36 36" aria-hidden="true"><g transform="translate(8 2) skewX(-20)"><rect x="0" y="7" width="7" height="22" rx="2" /><rect x="11" y="0" width="7" height="32" rx="2" /><rect x="22" y="7" width="7" height="22" rx="2" /></g></svg>
+      </div>
+    </section>
+
+    <section class="pv-view pv-split" id="view-login" hidden>
+      <div class="pv-hero">
+        <p class="pv-eyebrow pv-reveal" style="--d: 0ms"><i></i><span data-i18n="eyebrowLogin"></span></p>
+        <h1 class="pv-title">
+          <span class="pv-line"><span class="pv-line-in" style="--d: 60ms" data-i18n="heroLine1"></span></span>
+          <span class="pv-line"><span class="pv-line-in" style="--d: 140ms" data-i18n="heroLine2"></span></span>
+          <span class="pv-line"><em class="pv-line-in pv-shine-text" style="--d: 220ms" data-i18n="heroAccent"></em></span>
+        </h1>
+        <p class="pv-lead pv-reveal" style="--d: 320ms" data-i18n="heroLead"></p>
+        <ul class="pv-facts">
+          <li class="pv-reveal" style="--d: 420ms">
+            <span class="pv-fact-icon"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg></span>
+            <span data-i18n="fact1"></span>
+          </li>
+          <li class="pv-reveal" style="--d: 500ms">
+            <span class="pv-fact-icon"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" /><path d="m9 12 2 2 4-4" /></svg></span>
+            <span data-i18n="fact2"></span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="pv-card pv-auth pv-reveal" style="--d: 180ms">
+        <div class="pv-auth-head">
+          <span class="pv-auth-badge"><svg class="pv-mark pv-mark-lg" viewBox="0 0 36 36" aria-hidden="true"><g transform="translate(8 2) skewX(-20)"><rect x="0" y="7" width="7" height="22" rx="2" /><rect x="11" y="0" width="7" height="32" rx="2" /><rect x="22" y="7" width="7" height="22" rx="2" /></g></svg></span>
+          <b data-i18n="authTitle"></b>
+          <small data-i18n="authHint"></small>
+        </div>
+
+        <div class="pv-providers" id="auth-providers">
+          <button class="pv-provider pv-provider-google" type="button" id="google-start">
+            <span class="pv-provider-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.3H12v4.3h6a5.1 5.1 0 0 1-2.2 3.4v2.8h3.6c2-1.9 3.2-4.7 3.2-8.2z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.4-2.7l-3.6-2.8c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.4-2-6.3-4.6H2v2.9A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.7 14c-.2-.7-.4-1.3-.4-2s.1-1.4.4-2V7.1H2a11 11 0 0 0 0 9.8z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.3 1.7l3.2-3.2A11 11 0 0 0 2 7.1L5.7 10c.9-2.6 3.4-4.6 6.3-4.6z"/></svg></span>
+            <span class="pv-provider-text"><b data-i18n="googleTitle"></b><small data-i18n="googleHint"></small></span>
+            <span class="pv-btn-arrow">↗</span>
+          </button>
+          <button class="pv-provider pv-provider-telegram" type="button" id="telegram-start">
+            <span class="pv-provider-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 4-3 16-6-5-3 3v-5l9-8-11 7-4-2z" /></svg></span>
+            <span class="pv-provider-text"><b data-i18n="telegramTitle"></b><small data-i18n="telegramHint"></small></span>
+            <span class="pv-btn-arrow">↗</span>
+          </button>
+        </div>
+
+        <div class="pv-waiting" id="auth-waiting" hidden>
+          <span class="pv-dots"><i></i><i></i><i></i></span>
+          <div>
+            <p id="auth-waiting-text"></p>
+            <div class="pv-row">
+              <button class="pv-link" type="button" id="auth-reopen" data-i18n="reopen"></button>
+              <button class="pv-link pv-link-muted" type="button" id="auth-cancel" data-i18n="cancel"></button>
+            </div>
+          </div>
+        </div>
+
+        <p class="pv-error" id="auth-error" hidden></p>
+      </div>
+    </section>
+
+    <section class="pv-view" id="view-dash" hidden>
+      <div class="pv-split pv-dash">
+        <div class="pv-status">
+          <p class="pv-eyebrow pv-reveal" style="--d: 0ms"><i id="status-dot"></i><span id="status-eyebrow" class="pv-swap"></span></p>
+          <h1 class="pv-title pv-title-sm">
+            <span class="pv-line"><span class="pv-line-in pv-swap" style="--d: 60ms" id="status-line1"></span></span>
+            <span class="pv-line"><em class="pv-line-in pv-swap" style="--d: 140ms" id="status-line2"></em></span>
+          </h1>
+          <div class="pv-detail pv-reveal" style="--d: 240ms">
+            <span class="pv-ping" id="ping" hidden>
+              <span class="pv-bars"><i></i><i></i><i></i><i></i></span>
+              <b id="ping-value"></b>
+            </span>
+            <span class="pv-swap" id="status-detail"></span>
+          </div>
+
+          <div class="pv-routing pv-reveal" style="--d: 320ms">
+            <p class="pv-label" data-i18n="routing"></p>
+            <div class="pv-segment" id="routing">
+              <span class="pv-segment-pill" id="routing-pill"></span>
+              <button type="button" data-routing="smart"><b data-i18n="routingSmart"></b><small data-i18n="routingSmartHint"></small></button>
+              <button type="button" data-routing="global"><b data-i18n="routingGlobal"></b><small data-i18n="routingGlobalHint"></small></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pv-card pv-control pv-reveal" style="--d: 120ms">
+          <div class="pv-orb" id="orb" data-state="disconnected">
+            <span class="pv-orb-wave"></span>
+            <span class="pv-orb-wave" style="--w: 1"></span>
+            <span class="pv-orb-wave" style="--w: 2"></span>
+            <span class="pv-orb-track"></span>
+            <span class="pv-orb-sweep"></span>
+            <span class="pv-orb-satellite"></span>
+            <span class="pv-orb-burst" id="orb-burst"></span>
+            <button class="pv-orb-core" id="power" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.7a8 8 0 1 0 11.4 0" /></svg>
+            </button>
+          </div>
+          <p class="pv-power-label pv-swap" id="power-label"></p>
+          <p class="pv-stage pv-swap" id="stage"></p>
+        </div>
+      </div>
+
+      <div class="pv-banner pv-trial" id="trial-banner" hidden>
+        <div>
+          <b id="trial-title"></b>
+          <span data-i18n="trialText"></span>
+        </div>
+        <button class="pv-primary pv-compact" type="button" id="trial-claim">
+          <span class="pv-btn-text" data-i18n="trialButton"></span>
+          <span class="pv-btn-arrow">→</span>
+        </button>
+      </div>
+
+      <p class="pv-trial-done" id="trial-done" hidden></p>
+
+      <div class="pv-banner" id="subscription" hidden>
+        <div>
+          <b data-i18n="subTitle"></b>
+          <span data-i18n="subText"></span>
+        </div>
+        <button class="pv-primary pv-compact" type="button" id="subscribe">
+          <span class="pv-btn-text" data-i18n="subButton"></span>
+          <span class="pv-btn-arrow">↗</span>
+        </button>
+      </div>
+
+      <button class="pv-sub-chip pv-reveal" style="--d: 420ms" type="button" id="sub-chip" hidden>
+        <span class="pv-current-dot"></span>
+        <span id="sub-chip-text"></span>
+        <b data-i18n="extend"></b>
+      </button>
+
+      <p class="pv-error" id="vpn-error" hidden></p>
+
+      <div class="pv-stats pv-reveal" style="--d: 380ms" id="stats">
+        <div class="pv-stat">
+          <span data-i18n="statTime"></span>
+          <b id="stat-time">00:00:00</b>
+        </div>
+        <div class="pv-stat pv-stat-wide">
+          <span data-i18n="statDown"></span>
+          <b id="stat-down">—</b>
+          <svg class="pv-spark" id="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true">
+            <path class="pv-spark-area" id="spark-area" d="" />
+            <path class="pv-spark-line" id="spark-line" d="" />
+          </svg>
+        </div>
+        <div class="pv-stat">
+          <span data-i18n="statUp"></span>
+          <b id="stat-up">—</b>
+        </div>
+        <div class="pv-stat">
+          <span data-i18n="statTotal"></span>
+          <b id="stat-total">—</b>
+        </div>
+      </div>
+    </section>
+
+    <section class="pv-view" id="view-settings" hidden>
+      <div class="pv-settings-head pv-reveal" style="--d: 0ms">
+        <button class="pv-icon-btn" id="close-settings" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          <span data-i18n="back"></span>
+        </button>
+        <h2 class="pv-settings-title" data-i18n="settings"></h2>
+      </div>
+
+
+      <div class="pv-settings-grid">
+        <div class="pv-card pv-section pv-reveal" style="--d: 80ms">
+          <p class="pv-label" data-i18n="network"></p>
+          <div class="pv-setting">
+            <div><b data-i18n="ipv6"></b><small data-i18n="ipv6Hint"></small></div>
+            <button class="pv-switch" type="button" role="switch" data-setting="ipv6"><i></i></button>
+          </div>
+          <div class="pv-setting">
+            <div><b data-i18n="tunMode"></b><small data-i18n="tunHint"></small></div>
+            <button class="pv-switch" type="button" role="switch" data-setting="tun_mode"><i></i></button>
+          </div>
+        </div>
+
+        <div class="pv-card pv-section pv-split-card pv-reveal" style="--d: 160ms">
+          <div class="pv-setting">
+            <div><b data-i18n="splitTitle"></b><small data-i18n="splitHint"></small></div>
+            <button class="pv-switch" type="button" role="switch" data-setting="split_enabled"><i></i></button>
+          </div>
+
+          <div class="pv-split-body" id="split-body">
+            <div class="pv-split-inner">
+            <div class="pv-segment pv-segment-3" id="split-mode">
+              <span class="pv-segment-pill"></span>
+              <button type="button" data-mode="bypass"><b data-i18n="modeBypass"></b></button>
+              <button type="button" data-mode="only"><b data-i18n="modeOnly"></b></button>
+              <button type="button" data-mode="routing"><b data-i18n="modeRouting"></b></button>
+            </div>
+            <p class="pv-hint pv-mode-hint pv-swap" id="split-mode-hint"></p>
+
+            <div class="pv-list-block">
+              <div class="pv-list-head">
+                <p class="pv-label" data-i18n="apps"></p>
+                <button class="pv-chip-btn" type="button" id="pick-apps">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M8 21h8" /></svg>
+                  <span data-i18n="fromRunning"></span>
+                </button>
+              </div>
+              <form class="pv-add" id="app-form">
+                <input id="app-input" spellcheck="false" />
+                <button class="pv-add-btn" type="submit" aria-label="add">+</button>
+              </form>
+              <ul class="pv-chips" id="app-list"></ul>
+            </div>
+
+            <div class="pv-list-block">
+              <p class="pv-label" data-i18n="sites"></p>
+              <form class="pv-add" id="site-form">
+                <input id="site-input" spellcheck="false" />
+                <button class="pv-add-btn" type="submit" aria-label="add">+</button>
+              </form>
+              <ul class="pv-chips" id="site-list"></ul>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pv-view" id="view-plans" hidden>
+      <div class="pv-settings-head pv-reveal" style="--d: 0ms">
+        <button class="pv-icon-btn" id="close-plans" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          <span data-i18n="back"></span>
+        </button>
+        <h2 class="pv-settings-title" data-i18n="plans"></h2>
+        <span class="pv-balance" id="balance-chip" hidden></span>
+      </div>
+
+      <div class="pv-current pv-reveal" style="--d: 60ms" id="current-plan" hidden>
+        <span class="pv-current-dot"></span>
+        <div>
+          <b id="current-plan-name"></b>
+          <small id="current-plan-left"></small>
+        </div>
+      </div>
+
+      <p class="pv-error" id="plans-error" hidden></p>
+      <div class="pv-plans" id="plans-grid"></div>
+    </section>
+
+    <div class="pv-modal pv-coverage pv-trial-modal" id="trial-modal" data-step="offer" hidden>
+      <div class="pv-coverage-card">
+        <div class="pv-coverage-glow" aria-hidden="true"></div>
+        <div class="pv-trial-orb" aria-hidden="true">
+          <span class="pv-coverage-ring"></span>
+          <span class="pv-coverage-ring" style="--r: 1"></span>
+          <b id="trial-modal-days">3</b>
+          <small data-i18n="trialDaysWord"></small>
+        </div>
+        <p class="pv-coverage-eyebrow" data-i18n="trialEyebrow"></p>
+        <h2 class="pv-coverage-title" id="trial-modal-title"></h2>
+        <div class="pv-trial-step" data-show="offer">
+          <p class="pv-coverage-lead" data-i18n="trialLead"></p>
+          <ul class="pv-coverage-steps">
+            <li style="--i: 0"><b>✓</b><span data-i18n="trialPerk1"></span></li>
+            <li style="--i: 1"><b>✓</b><span data-i18n="trialPerk2"></span></li>
+            <li style="--i: 2"><b>✓</b><span data-i18n="trialPerk3"></span></li>
+          </ul>
+          <div class="pv-coverage-actions">
+            <button class="pv-primary" type="button" id="trial-modal-claim">
+              <span class="pv-btn-text"></span>
+              <span class="pv-btn-arrow">→</span>
+            </button>
+            <button class="pv-link pv-link-muted" type="button" id="trial-modal-later" data-i18n="trialLater"></button>
+          </div>
+        </div>
+        <div class="pv-trial-step" data-show="result">
+          <p class="pv-coverage-lead pv-trial-result" id="trial-modal-result"></p>
+          <div class="pv-coverage-actions">
+            <button class="pv-primary" type="button" id="trial-modal-done">
+              <span class="pv-btn-text" data-i18n="trialContinue"></span>
+              <span class="pv-btn-arrow">→</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pv-modal pv-coverage pv-admin-modal" id="admin-modal" hidden>
+      <div class="pv-coverage-card pv-admin-card">
+        <div class="pv-admin-icon" aria-hidden="true">
+          <span class="pv-coverage-ring"></span>
+          <svg viewBox="0 0 24 24"><path d="M12 2.5 4.5 5.3v5.6c0 4.9 3.2 8.4 7.5 9.8 4.3-1.4 7.5-4.9 7.5-9.8V5.3z" /><rect x="9" y="10.5" width="6" height="5" rx="1" /><path d="M10.2 10.5V9a1.8 1.8 0 0 1 3.6 0v1.5" /></svg>
+        </div>
+        <h3 class="pv-admin-title" data-i18n="adminTitle"></h3>
+        <p class="pv-admin-text" id="admin-modal-text"></p>
+        <button class="pv-primary" type="button" id="admin-modal-close">
+          <span class="pv-btn-text" data-i18n="coverageClose"></span>
+          <span class="pv-btn-arrow">✓</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="pv-modal pv-coverage" id="coverage-modal" hidden>
+      <div class="pv-coverage-card">
+        <div class="pv-coverage-glow" aria-hidden="true"></div>
+        <div class="pv-coverage-icon" aria-hidden="true">
+          <span class="pv-coverage-ring"></span>
+          <svg viewBox="0 0 24 24"><path d="M12 2.5 4.5 5.3v5.6c0 4.9 3.2 8.4 7.5 9.8 4.3-1.4 7.5-4.9 7.5-9.8V5.3z" /><path d="M12 8v4.5" /><path d="M12 15.8h.01" /></svg>
+        </div>
+        <p class="pv-coverage-eyebrow" data-i18n="coverageEyebrow"></p>
+        <h2 class="pv-coverage-title" data-i18n="coverageTitle"></h2>
+        <p class="pv-coverage-lead" data-i18n="coverageText"></p>
+        <ul class="pv-coverage-steps">
+          <li style="--i: 0"><b>1</b><span data-i18n="coverageStepProxy"></span></li>
+          <li style="--i: 1"><b>2</b><span data-i18n="coverageStepTun"></span></li>
+          <li style="--i: 2"><b>3</b><span data-i18n="coverageStepSplit"></span></li>
+        </ul>
+        <div class="pv-coverage-actions">
+          <button class="pv-primary" type="button" id="coverage-close">
+            <span class="pv-btn-text" data-i18n="coverageClose"></span>
+            <span class="pv-btn-arrow">✓</span>
+          </button>
+          <button class="pv-secondary" type="button" id="coverage-settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10" /><path d="M18 7h2" /><circle cx="16" cy="7" r="2" /><path d="M4 17h4" /><path d="M12 17h8" /><circle cx="10" cy="17" r="2" /></svg>
+            <span data-i18n="coverageAction"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pv-modal" id="checkout" hidden>
+      <div class="pv-modal-card pv-checkout">
+        <div class="pv-modal-head">
+          <div class="pv-checkout-title">
+            <small data-i18n="checkoutTitle"></small>
+            <b id="checkout-plan"></b>
+          </div>
+          <button class="pv-icon-btn" type="button" id="checkout-close" aria-label="close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12" /><path d="M18 6 6 18" /></svg>
+          </button>
+        </div>
+
+        <div class="pv-checkout-step" data-step="choose">
+          <div class="pv-methods" id="checkout-methods">
+            <button type="button" data-method="sbp">
+              <span class="pv-method-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" /></svg></span>
+              <b data-i18n="methodSbp"></b><small data-i18n="methodSbpHint"></small>
+            </button>
+            <button type="button" data-method="crypto">
+              <span class="pv-method-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M10 8h3a2 2 0 0 1 0 4h-3zM10 12h3.5a2 2 0 0 1 0 4H10zM10 8v8M11 6v2M11 16v2" /></svg></span>
+              <b data-i18n="methodCrypto"></b><small data-i18n="methodCryptoHint"></small>
+            </button>
+            <button type="button" data-method="balance">
+              <span class="pv-method-icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M16 12.5h2" /><path d="M3 10h18" /></svg></span>
+              <b data-i18n="methodBalance"></b><small id="balance-hint"></small>
+            </button>
+          </div>
+          <div class="pv-total">
+            <span data-i18n="total"></span>
+            <b id="checkout-amount">—</b>
+          </div>
+          <button class="pv-primary" type="button" id="checkout-pay">
+            <span class="pv-btn-text"></span>
+            <span class="pv-btn-arrow">→</span>
+          </button>
+        </div>
+
+        <div class="pv-checkout-step pv-center" data-step="busy">
+          <span class="pv-big-spinner"></span>
+          <p class="pv-hint" id="checkout-busy-text"></p>
+        </div>
+
+        <div class="pv-checkout-step pv-center" data-step="ready">
+          <div class="pv-qr"><img id="checkout-qr" alt="QR" /></div>
+          <p class="pv-total pv-total-inline"><span data-i18n="toPay"></span><b id="checkout-ready-amount"></b></p>
+          <p class="pv-hint" id="checkout-qr-hint"></p>
+          <code class="pv-qr-text" id="checkout-qr-text"></code>
+          <button class="pv-primary pv-compact" type="button" id="checkout-open">
+            <span class="pv-btn-text" data-i18n="openPayment"></span>
+            <span class="pv-btn-arrow">↗</span>
+          </button>
+          <p class="pv-waiting-line"><span class="pv-dots"><i></i><i></i><i></i></span><span data-i18n="waitingPayment"></span></p>
+        </div>
+
+        <div class="pv-checkout-step pv-center" data-step="link">
+          <span class="pv-method-icon pv-method-icon-lg"><svg viewBox="0 0 24 24"><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg></span>
+          <p class="pv-hint" data-i18n="linkHint"></p>
+          <button class="pv-primary" type="button" id="checkout-open-link">
+            <span class="pv-btn-text" data-i18n="openPayment"></span>
+            <span class="pv-btn-arrow">↗</span>
+          </button>
+          <p class="pv-waiting-line"><span class="pv-dots"><i></i><i></i><i></i></span><span data-i18n="waitingPayment"></span></p>
+        </div>
+
+        <div class="pv-checkout-step pv-center" data-step="success">
+          <svg class="pv-success" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24" /><path d="M15 27l7 7 15-16" /></svg>
+          <b class="pv-success-title" id="checkout-success-title"></b>
+          <p class="pv-hint" data-i18n="successHint"></p>
+          <button class="pv-primary" type="button" id="checkout-connect">
+            <span class="pv-btn-text" data-i18n="powerConnect"></span>
+            <span class="pv-btn-arrow">→</span>
+          </button>
+        </div>
+
+        <div class="pv-checkout-step pv-center" data-step="failed">
+          <p class="pv-error" id="checkout-error"></p>
+          <button class="pv-primary" type="button" id="checkout-retry">
+            <span class="pv-btn-text" data-i18n="retry"></span>
+            <span class="pv-btn-arrow">↻</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pv-modal" id="picker" hidden>
+      <div class="pv-modal-card">
+        <div class="pv-modal-head">
+          <b data-i18n="fromRunning"></b>
+          <button class="pv-icon-btn" type="button" id="picker-close" aria-label="close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12" /><path d="M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <input class="pv-search" id="picker-search" spellcheck="false" />
+        <ul class="pv-picker-list" id="picker-list"></ul>
+        <button class="pv-primary" type="button" id="picker-add">
+          <span class="pv-btn-text"></span>
+          <span class="pv-btn-arrow">→</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/server-text.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/format.js"></script>
+  <script src="js/motion.js"></script>
+  <script src="js/sparkline.js"></script>
+  <script src="js/login-view.js"></script>
+  <script src="js/dashboard-view.js"></script>
+  <script src="js/process-picker.js"></script>
+  <script src="js/overlay.js"></script>
+  <script src="js/admin-modal.js"></script>
+  <script src="js/settings-view.js"></script>
+  <script src="js/checkout-view.js"></script>
+  <script src="js/plans-view.js"></script>
+  <script src="js/trial-modal.js"></script>
+  <script src="js/coverage-modal.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
