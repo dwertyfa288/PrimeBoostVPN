@@ -1,4 +1,4 @@
-use std::net::{TcpListener, ToSocketAddrs};
+use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
 use crate::api::{self, ApiError};
@@ -14,15 +14,14 @@ use crate::vless::{self, VlessConfig};
 use crate::xray::{self, BridgeLaunch};
 
 const KEY_ATTEMPTS_PER_LOCATION: usize = 3;
-const WATCHDOG_INTERVAL: Duration = Duration::from_secs(10);
-const WATCHDOG_CONFIRM_INTERVAL: Duration = Duration::from_secs(2);
-const WATCHDOG_CONFIRM_PROBES: usize = 3;
-const WATCHDOG_SLEEP_GAP: Duration = Duration::from_secs(30);
+const WATCHDOG_INTERVAL: Duration = Duration::from_secs(3);
+const WATCHDOG_CONFIRM_INTERVAL: Duration = Duration::from_millis(500);
+const WATCHDOG_CONFIRM_PROBES: usize = 2;
+const WATCHDOG_SLEEP_GAP: Duration = Duration::from_secs(15);
 const RECOVERY_BASE_DELAY: Duration = Duration::from_secs(3);
 const RECOVERY_MAX_DELAY: Duration = Duration::from_secs(60);
-const LATENCY_TIMEOUT: Duration = Duration::from_millis(1500);
 const PROBE_DEADLINE: Duration = Duration::from_secs(4);
-const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const PROBE_RETRY: Duration = Duration::from_millis(300);
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(8);
 const PROBE_URLS: [&str; 2] = [
@@ -33,7 +32,7 @@ const PROBE_URLS: [&str; 2] = [
 struct Candidate {
     id: String,
     meta: LocationMeta,
-    latency_ms: Option<u64>,
+    score_ms: u64,
 }
 
 enum Failure {
@@ -113,7 +112,7 @@ async fn run_connect(app: &SharedApp, flow: u64, mut excluded: Vec<String>) -> R
                 name: candidate.meta.name.clone(),
                 name_en: candidate.meta.name_en.clone(),
                 country: candidate.meta.country.clone(),
-                latency_ms: candidate.latency_ms.map(display_latency),
+                latency_ms: None,
             });
         }
         for _ in 0..KEY_ATTEMPTS_PER_LOCATION {
@@ -170,42 +169,16 @@ async fn rank_candidates(app: &SharedApp, token: &str) -> Result<Vec<Candidate>,
         return Err(Failure::Message("Нет доступных серверов".into()));
     }
 
-    let lookups = server_locations.into_iter().map(|location| async move {
-        let latency_ms = match (&location.ping_host, &location.ping_port) {
-            (Some(host), Some(port)) => measure_latency(host, port).await,
-            _ => None,
-        };
-        Candidate { meta: locations::describe(&location.id), id: location.id, latency_ms }
-    });
-    let mut candidates = futures_join_all(lookups).await;
-    candidates.sort_by_key(|candidate| candidate.latency_ms.unwrap_or(u64::MAX));
+    let mut candidates: Vec<Candidate> = server_locations
+        .into_iter()
+        .map(|location| Candidate {
+            meta: locations::describe(&location.id),
+            id: location.id,
+            score_ms: location.score_ms,
+        })
+        .collect();
+    candidates.sort_by_key(|candidate| if candidate.score_ms > 0 { candidate.score_ms } else { u64::MAX });
     Ok(candidates)
-}
-
-async fn futures_join_all<F: std::future::Future + Send + 'static>(futures: impl Iterator<Item = F>) -> Vec<F::Output>
-where
-    F::Output: Send + 'static,
-{
-    let handles: Vec<_> = futures.map(tokio::spawn).collect();
-    let mut results = Vec::with_capacity(handles.len());
-    for handle in handles {
-        if let Ok(output) = handle.await {
-            results.push(output);
-        }
-    }
-    results
-}
-
-async fn measure_latency(host: &str, port: &str) -> Option<u64> {
-    let target = format!("{}:{port}", bracket_ipv6(host));
-    let lookup = tokio::task::spawn_blocking(move || target.to_socket_addrs().ok()?.next());
-    let address = tokio::time::timeout(LATENCY_TIMEOUT, lookup).await.ok()?.ok()??;
-    let started = Instant::now();
-    tokio::time::timeout(LATENCY_TIMEOUT, tokio::net::TcpStream::connect(address))
-        .await
-        .ok()?
-        .ok()?;
-    Some(started.elapsed().as_millis() as u64)
 }
 
 const DISPLAY_LATENCY_MAX: u64 = 95;
@@ -216,14 +189,6 @@ pub fn display_latency(ms: u64) -> u64 {
         ms
     } else {
         DISPLAY_LATENCY_FLOOR + ms % (DISPLAY_LATENCY_MAX - DISPLAY_LATENCY_FLOOR + 1)
-    }
-}
-
-fn bracket_ipv6(address: &str) -> String {
-    if address.contains(':') && !address.starts_with('[') {
-        format!("[{address}]")
-    } else {
-        address.to_owned()
     }
 }
 

@@ -150,8 +150,8 @@ pub struct ServerLocation {
     #[serde(rename = "location")]
     pub id: String,
     pub available: bool,
-    pub ping_host: Option<String>,
-    pub ping_port: Option<String>,
+    #[serde(default)]
+    pub score_ms: u64,
 }
 
 #[derive(Deserialize)]
