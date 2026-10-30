@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 pub enum ApiError {
     Unauthorized,
     NoSubscription,
+    NoKeys,
     Server(String),
     Network(String),
 }
@@ -16,6 +17,7 @@ impl std::fmt::Display for ApiError {
         match self {
             Self::Unauthorized => f.write_str("Сессия истекла, войдите снова"),
             Self::NoSubscription => f.write_str("Нет активной подписки"),
+            Self::NoKeys => f.write_str("Нет рабочих серверов"),
             Self::Server(message) => f.write_str(message),
             Self::Network(message) => write!(f, "Нет связи с сервером: {message}"),
         }
@@ -143,23 +145,62 @@ pub async fn has_subscription(token: &str) -> Result<bool, ApiError> {
     }
 }
 
-pub async fn fetch_key(token: &str, location: &str) -> Result<String, ApiError> {
+#[derive(Debug, Clone, Deserialize)]
+pub struct ServerLocation {
+    #[serde(rename = "location")]
+    pub id: String,
+    pub available: bool,
+    pub ping_host: Option<String>,
+    pub ping_port: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct LocationsResponse {
+    locations: Vec<ServerLocation>,
+}
+
+#[derive(Deserialize)]
+pub struct IssuedKey {
+    pub key_id: String,
+    pub key: String,
+}
+
+pub async fn fetch_locations(token: &str) -> Result<Vec<ServerLocation>, ApiError> {
     let request = client()
-        .post(format!("{}/vpn/get-key", crate::endpoints::key_api()))
-        .bearer_auth(token)
-        .json(&json!({ "location": location }));
+        .get(format!("{}/vpn/locations", crate::endpoints::site_api()))
+        .bearer_auth(token);
     let (status, body) = send(request).await?;
     match status {
-        200 => {
-            let key = body.trim();
-            if key.starts_with("vless://") {
-                Ok(key.to_owned())
-            } else {
-                Err(ApiError::Server("Сервер вернул некорректный ключ".into()))
-            }
-        }
-        401 => Err(ApiError::Unauthorized),
-        402 | 403 => Err(ApiError::NoSubscription),
+        200 => serde_json::from_str::<LocationsResponse>(&body)
+            .map(|response| response.locations.into_iter().filter(|location| location.available).collect())
+            .map_err(|_| ApiError::Server("Некорректный ответ сервера".into())),
+        401 | 403 => Err(ApiError::Unauthorized),
+        _ => Err(ApiError::Server(server_message(&body, "Ошибка получения локаций"))),
+    }
+}
+
+pub async fn fetch_key(token: &str, location: &str, excluded: &[String]) -> Result<IssuedKey, ApiError> {
+    let request = client()
+        .post(format!("{}/vpn/connect", crate::endpoints::site_api()))
+        .bearer_auth(token)
+        .json(&json!({ "location": location, "exclude": excluded }));
+    let (status, body) = send(request).await?;
+    match status {
+        200 => match serde_json::from_str::<IssuedKey>(&body) {
+            Ok(issued) if issued.key.starts_with("vless://") => Ok(issued),
+            _ => Err(ApiError::Server("Сервер вернул некорректный ключ".into())),
+        },
+        401 | 403 => Err(ApiError::Unauthorized),
+        402 => Err(ApiError::NoSubscription),
+        503 => Err(ApiError::NoKeys),
         _ => Err(ApiError::Server(format!("Сервер ключей ответил {status}"))),
     }
+}
+
+pub async fn report_failed_key(token: &str, key_id: &str) {
+    let request = client()
+        .post(format!("{}/vpn/report", crate::endpoints::site_api()))
+        .bearer_auth(token)
+        .json(&json!({ "key_id": key_id }));
+    let _ = send(request).await;
 }

@@ -129,6 +129,7 @@ impl PrimeVpn {
         self.app.state.lock().settings = settings::load();
         self.spawn(auth::restore);
         self.spawn(vpn::monitor);
+        self.spawn(vpn::watchdog);
         Ok(())
     }
 

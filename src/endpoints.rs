@@ -10,7 +10,6 @@ const SEED: &[u8] = b"primeboost-astra-endpoints/1";
 struct Endpoints {
     site_url: String,
     site_api: String,
-    key_api: String,
 }
 
 static ENDPOINTS: OnceLock<Endpoints> = OnceLock::new();
@@ -42,15 +41,10 @@ pub fn site_api() -> &'static str {
     &endpoints().site_api
 }
 
-pub fn key_api() -> &'static str {
-    &endpoints().key_api
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
     fn sealed_endpoints_decode() {
         assert!(super::site_api().starts_with(super::site_url()));
-        assert!(super::key_api().starts_with("http"));
     }
 }

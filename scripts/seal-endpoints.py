@@ -6,7 +6,7 @@ import sys
 
 SEED = b"primeboost-astra-endpoints/1"
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-FIELDS = ("site_url", "site_api", "key_api")
+FIELDS = ("site_url", "site_api")
 
 
 def seal(data: bytes) -> bytes:

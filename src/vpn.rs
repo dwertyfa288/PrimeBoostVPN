@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use crate::api::{self, ApiError};
 use crate::app::SharedApp;
 use crate::auth;
-use crate::locations::{LOCATIONS, Location};
+use crate::locations::{self, LocationMeta};
 use crate::settings::{self, VpnSettings};
 use crate::singbox_config::{self, Bridge, CoreOptions};
 use crate::split;
@@ -13,7 +13,13 @@ use crate::system_proxy;
 use crate::vless::{self, VlessConfig};
 use crate::xray::{self, BridgeLaunch};
 
-const RANKING_BUDGET: Duration = Duration::from_secs(3);
+const KEY_ATTEMPTS_PER_LOCATION: usize = 3;
+const WATCHDOG_INTERVAL: Duration = Duration::from_secs(10);
+const WATCHDOG_CONFIRM_INTERVAL: Duration = Duration::from_secs(2);
+const WATCHDOG_CONFIRM_PROBES: usize = 3;
+const WATCHDOG_SLEEP_GAP: Duration = Duration::from_secs(30);
+const RECOVERY_BASE_DELAY: Duration = Duration::from_secs(3);
+const RECOVERY_MAX_DELAY: Duration = Duration::from_secs(60);
 const LATENCY_TIMEOUT: Duration = Duration::from_millis(1500);
 const PROBE_DEADLINE: Duration = Duration::from_secs(4);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
@@ -25,13 +31,14 @@ const PROBE_URLS: [&str; 2] = [
 ];
 
 struct Candidate {
-    location: &'static Location,
-    server: VlessConfig,
+    id: String,
+    meta: LocationMeta,
     latency_ms: Option<u64>,
 }
 
 enum Failure {
     Cancelled,
+    Fatal(String),
     Message(String),
 }
 
@@ -51,10 +58,10 @@ pub async fn connect(app: SharedApp) {
         state.connect_flow
     };
 
-    match run_connect(&app, flow).await {
+    match run_connect(&app, flow, Vec::new()).await {
         Ok(()) => {}
         Err(Failure::Cancelled) => {}
-        Err(Failure::Message(message)) => {
+        Err(Failure::Fatal(message) | Failure::Message(message)) => {
             let mut state = app.state.lock();
             if state.connect_flow == flow {
                 state.vpn = VpnStatus::Disconnected;
@@ -78,7 +85,7 @@ fn set_stage(app: &SharedApp, stage: &str) {
     app.state.lock().stage = stage.to_owned();
 }
 
-async fn run_connect(app: &SharedApp, flow: u64) -> Result<(), Failure> {
+async fn run_connect(app: &SharedApp, flow: u64, mut excluded: Vec<String>) -> Result<(), Failure> {
     let token = app.state.lock().token.clone().ok_or(Failure::Cancelled)?;
 
     match api::has_subscription(&token).await {
@@ -86,7 +93,7 @@ async fn run_connect(app: &SharedApp, flow: u64) -> Result<(), Failure> {
         Ok(false) => return Err(no_subscription(app)),
         Err(ApiError::Unauthorized) => {
             auth::handle_unauthorized(app);
-            return Err(Failure::Message("Сессия истекла, войдите снова".into()));
+            return Err(Failure::Fatal("Сессия истекла, войдите снова".into()));
         }
         Err(error) => return Err(Failure::Message(error.to_string())),
     }
@@ -98,22 +105,47 @@ async fn run_connect(app: &SharedApp, flow: u64) -> Result<(), Failure> {
 
     let mut last_error = String::from("Не удалось подключиться ни к одному серверу");
     for candidate in candidates {
-        is_current(app, flow)?;
         {
             let mut state = app.state.lock();
-            state.stage = format!("Подключение · {}", candidate.location.name);
+            state.stage = format!("Подключение · {}", candidate.meta.name);
             state.location = Some(ActiveLocation {
-                id: candidate.location.id.into(),
-                name: candidate.location.name.into(),
-                name_en: candidate.location.name_en.into(),
-                country: candidate.location.country.into(),
+                id: candidate.id.clone(),
+                name: candidate.meta.name.clone(),
+                name_en: candidate.meta.name_en.clone(),
+                country: candidate.meta.country.clone(),
                 latency_ms: candidate.latency_ms.map(display_latency),
             });
         }
-        match start_on(app, flow, &candidate.server).await {
-            Ok(()) => return Ok(()),
-            Err(Failure::Cancelled) => return Err(Failure::Cancelled),
-            Err(Failure::Message(message)) => last_error = message,
+        for _ in 0..KEY_ATTEMPTS_PER_LOCATION {
+            is_current(app, flow)?;
+            let issued = match api::fetch_key(&token, &candidate.id, &excluded).await {
+                Ok(issued) => issued,
+                Err(ApiError::Unauthorized) => {
+                    auth::handle_unauthorized(app);
+                    return Err(Failure::Fatal("Сессия истекла, войдите снова".into()));
+                }
+                Err(ApiError::NoSubscription) => return Err(no_subscription(app)),
+                Err(error) => {
+                    last_error = error.to_string();
+                    break;
+                }
+            };
+            let result = match vless::parse(&issued.key) {
+                Ok(server) => start_on(app, flow, &server).await,
+                Err(message) => Err(Failure::Message(message)),
+            };
+            match result {
+                Ok(()) => {
+                    app.state.lock().key_id = Some(issued.key_id);
+                    return Ok(());
+                }
+                Err(Failure::Message(message)) => {
+                    last_error = message;
+                    api::report_failed_key(&token, &issued.key_id).await;
+                    excluded.push(issued.key_id);
+                }
+                Err(failure) => return Err(failure),
+            }
         }
     }
     Err(Failure::Message(last_error))
@@ -122,49 +154,30 @@ async fn run_connect(app: &SharedApp, flow: u64) -> Result<(), Failure> {
 fn no_subscription(app: &SharedApp) -> Failure {
     let mut state = app.state.lock();
     state.subscription = Subscription::None;
-    Failure::Message("Нет активной подписки".into())
+    Failure::Fatal("Нет активной подписки".into())
 }
 
 async fn rank_candidates(app: &SharedApp, token: &str) -> Result<Vec<Candidate>, Failure> {
-    let lookups = LOCATIONS.iter().map(|location| {
-        let token = token.to_owned();
-        async move {
-            let key = tokio::time::timeout(RANKING_BUDGET, api::fetch_key(&token, location.id))
-                .await
-                .unwrap_or_else(|_| Err(ApiError::Server("Сервер не отвечает".into())));
-            let server = match key {
-                Ok(key) => vless::parse(&key).map_err(ApiError::Server),
-                Err(error) => Err(error),
-            };
-            match server {
-                Ok(server) => {
-                    let latency_ms = measure_latency(&server).await;
-                    Ok(Candidate { location, server, latency_ms })
-                }
-                Err(error) => Err(error),
-            }
+    let server_locations = match api::fetch_locations(token).await {
+        Ok(server_locations) => server_locations,
+        Err(ApiError::Unauthorized) => {
+            auth::handle_unauthorized(app);
+            return Err(Failure::Fatal("Сессия истекла, войдите снова".into()));
         }
-    });
-    let results = futures_join_all(lookups).await;
+        Err(error) => return Err(Failure::Message(error.to_string())),
+    };
+    if server_locations.is_empty() {
+        return Err(Failure::Message("Нет доступных серверов".into()));
+    }
 
-    let mut candidates = Vec::new();
-    let mut last_error = None;
-    for result in results {
-        match result {
-            Ok(candidate) => candidates.push(candidate),
-            Err(ApiError::Unauthorized) => {
-                auth::handle_unauthorized(app);
-                return Err(Failure::Message("Сессия истекла, войдите снова".into()));
-            }
-            Err(ApiError::NoSubscription) => return Err(no_subscription(app)),
-            Err(error) => last_error = Some(error.to_string()),
-        }
-    }
-    if candidates.is_empty() {
-        return Err(Failure::Message(
-            last_error.unwrap_or_else(|| "Нет доступных серверов".into()),
-        ));
-    }
+    let lookups = server_locations.into_iter().map(|location| async move {
+        let latency_ms = match (&location.ping_host, &location.ping_port) {
+            (Some(host), Some(port)) => measure_latency(host, port).await,
+            _ => None,
+        };
+        Candidate { meta: locations::describe(&location.id), id: location.id, latency_ms }
+    });
+    let mut candidates = futures_join_all(lookups).await;
     candidates.sort_by_key(|candidate| candidate.latency_ms.unwrap_or(u64::MAX));
     Ok(candidates)
 }
@@ -183,8 +196,8 @@ where
     results
 }
 
-async fn measure_latency(server: &VlessConfig) -> Option<u64> {
-    let target = format!("{}:{}", bracket_ipv6(&server.address), server.port);
+async fn measure_latency(host: &str, port: &str) -> Option<u64> {
+    let target = format!("{}:{port}", bracket_ipv6(host));
     let lookup = tokio::task::spawn_blocking(move || target.to_socket_addrs().ok()?.next());
     let address = tokio::time::timeout(LATENCY_TIMEOUT, lookup).await.ok()?.ok()??;
     let started = Instant::now();
@@ -316,14 +329,7 @@ async fn stop_core(app: &SharedApp) {
 }
 
 async fn probe_until_ready(app: &SharedApp, flow: u64, port: u16) -> Result<(), Failure> {
-    let proxy = reqwest::Proxy::all(format!("http://127.0.0.1:{port}"))
-        .map_err(|error| Failure::Message(error.to_string()))?;
-    let client = reqwest::Client::builder()
-        .proxy(proxy)
-        .connect_timeout(PROBE_TIMEOUT)
-        .timeout(PROBE_TIMEOUT)
-        .build()
-        .map_err(|error| Failure::Message(error.to_string()))?;
+    let client = probe_client(port)?;
 
     let deadline = Instant::now() + PROBE_DEADLINE;
     let mut last_error = String::from("Сервер не отвечает или ключ не работает");
@@ -337,27 +343,121 @@ async fn probe_until_ready(app: &SharedApp, flow: u64, port: u16) -> Result<(), 
                 format!("Ядро VPN остановилось: {details}")
             }));
         }
-        let mut probes = tokio::task::JoinSet::new();
-        for url in PROBE_URLS {
-            let client = client.clone();
-            probes.spawn(async move {
-                match client.get(url).send().await {
-                    Ok(response) if response.status().is_success() => Ok(()),
-                    Ok(response) => Err(format!("Проверка соединения: {}", response.status())),
-                    Err(error) => Err(format!("Проверка соединения: {}", error.without_url())),
-                }
-            });
-        }
-        while let Some(result) = probes.join_next().await {
-            match result {
-                Ok(Ok(())) => return Ok(()),
-                Ok(Err(error)) => last_error = error,
-                Err(error) => last_error = error.to_string(),
-            }
+        match probe_once(&client).await {
+            Ok(()) => return Ok(()),
+            Err(error) => last_error = error,
         }
         tokio::time::sleep(PROBE_RETRY).await;
     }
     Err(Failure::Message(last_error))
+}
+
+fn probe_client(port: u16) -> Result<reqwest::Client, Failure> {
+    let proxy = reqwest::Proxy::all(format!("http://127.0.0.1:{port}"))
+        .map_err(|error| Failure::Message(error.to_string()))?;
+    reqwest::Client::builder()
+        .proxy(proxy)
+        .connect_timeout(PROBE_TIMEOUT)
+        .timeout(PROBE_TIMEOUT)
+        .build()
+        .map_err(|error| Failure::Message(error.to_string()))
+}
+
+async fn probe_once(client: &reqwest::Client) -> Result<(), String> {
+    let mut probes = tokio::task::JoinSet::new();
+    for url in PROBE_URLS {
+        let client = client.clone();
+        probes.spawn(async move {
+            match client.get(url).send().await {
+                Ok(response) if response.status().is_success() => Ok(()),
+                Ok(response) => Err(format!("Проверка соединения: {}", response.status())),
+                Err(error) => Err(format!("Проверка соединения: {}", error.without_url())),
+            }
+        });
+    }
+    let mut last_error = String::from("Сервер не отвечает или ключ не работает");
+    while let Some(result) = probes.join_next().await {
+        match result {
+            Ok(Ok(())) => return Ok(()),
+            Ok(Err(error)) => last_error = error,
+            Err(error) => last_error = error.to_string(),
+        }
+    }
+    Err(last_error)
+}
+
+pub async fn watchdog(app: SharedApp) {
+    let mut last_tick = Instant::now();
+    loop {
+        tokio::time::sleep(WATCHDOG_INTERVAL).await;
+        let resumed_from_sleep = last_tick.elapsed() > WATCHDOG_SLEEP_GAP;
+        last_tick = Instant::now();
+        if resumed_from_sleep {
+            continue;
+        }
+        if tunnel_failed(&app).await {
+            recover(&app).await;
+        }
+        last_tick = Instant::now();
+    }
+}
+
+async fn tunnel_failed(app: &SharedApp) -> bool {
+    for _ in 0..WATCHDOG_CONFIRM_PROBES {
+        let (connected, port) = {
+            let state = app.state.lock();
+            (state.vpn == VpnStatus::Connected, state.proxy_port)
+        };
+        if !connected {
+            return false;
+        }
+        let Ok(client) = probe_client(port) else {
+            return false;
+        };
+        if probe_once(&client).await.is_ok() {
+            return false;
+        }
+        tokio::time::sleep(WATCHDOG_CONFIRM_INTERVAL).await;
+    }
+    app.state.lock().vpn == VpnStatus::Connected
+}
+
+async fn recover(app: &SharedApp) {
+    let (flow, failed_key, token) = {
+        let mut state = app.state.lock();
+        if state.vpn != VpnStatus::Connected {
+            return;
+        }
+        state.connect_flow += 1;
+        state.vpn = VpnStatus::Connecting;
+        state.stage = "Переподключение".into();
+        (state.connect_flow, state.key_id.take(), state.token.clone())
+    };
+    stop_core(app).await;
+    if let (Some(key_id), Some(token)) = (&failed_key, &token) {
+        api::report_failed_key(token, key_id).await;
+    }
+
+    let excluded: Vec<String> = failed_key.into_iter().collect();
+    let mut delay = RECOVERY_BASE_DELAY;
+    loop {
+        match run_connect(app, flow, excluded.clone()).await {
+            Ok(()) | Err(Failure::Cancelled) => return,
+            Err(Failure::Fatal(message)) => {
+                if app.state.lock().connect_flow == flow {
+                    reset_disconnected(app, &message);
+                }
+                return;
+            }
+            Err(Failure::Message(_)) => {}
+        }
+        if app.state.lock().connect_flow != flow {
+            return;
+        }
+        app.state.lock().stage = "Переподключение".into();
+        tokio::time::sleep(delay).await;
+        delay = (delay * 2).min(RECOVERY_MAX_DELAY);
+    }
 }
 
 pub async fn disconnect(app: SharedApp) {
@@ -378,6 +478,7 @@ fn reset_disconnected(app: &SharedApp, error: &str) {
     let mut state = app.state.lock();
     state.vpn = VpnStatus::Disconnected;
     state.stage.clear();
+    state.key_id = None;
     state.vpn_error = error.to_owned();
     state.location = None;
     state.connected_at = None;
@@ -437,16 +538,8 @@ pub async fn monitor(app: SharedApp) {
         }
 
         if !app.core.is_running() {
-            let details = app.core.last_errors();
             system_proxy::disable();
-            reset_disconnected(
-                &app,
-                &if details.is_empty() {
-                    "Соединение прервано".to_owned()
-                } else {
-                    format!("Соединение прервано: {details}")
-                },
-            );
+            recover(&app).await;
             continue;
         }
 
