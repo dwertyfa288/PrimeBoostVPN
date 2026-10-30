@@ -8,8 +8,18 @@ use parking_lot::Mutex;
 
 use crate::paths;
 use crate::privileges;
+use crate::xray::{BridgeLaunch, XrayBridge};
 
 const PID_FILE: &str = "core.pid";
+const XRAY_PID_FILE: &str = "xray.pid";
+#[cfg(windows)]
+const CORE_IMAGE: &str = "prime-vpn-core.exe";
+#[cfg(windows)]
+const XRAY_IMAGE: &str = "prime-vpn-xray.exe";
+#[cfg(not(windows))]
+const CORE_IMAGE: &str = "prime-vpn-core";
+#[cfg(not(windows))]
+const XRAY_IMAGE: &str = "prime-vpn-xray";
 const LOG_LIMIT: usize = 40;
 
 enum Running {
@@ -21,30 +31,52 @@ enum Running {
 #[derive(Default)]
 pub struct Core {
     running: Mutex<Option<Running>>,
+    bridge: Mutex<Option<XrayBridge>>,
     log: Arc<Mutex<VecDeque<String>>>,
 }
 
 impl Core {
-    pub fn start(&self, config_json: &str, needs_tun: bool) -> Result<(), String> {
+    pub fn start(&self, config_json: &str, needs_tun: bool, bridge: Option<&BridgeLaunch>) -> Result<(), String> {
         self.stop();
-        kill_orphan();
+        kill_orphan(PID_FILE, CORE_IMAGE);
+        kill_orphan(XRAY_PID_FILE, XRAY_IMAGE);
         self.log.lock().clear();
 
         let binary = crate::core_assets::ensure()?;
         ensure_executable(&binary);
+        let result = self.start_bridge(bridge).and_then(|_| self.start_core(&binary, config_json, needs_tun));
+        if result.is_err() {
+            self.stop();
+        }
+        result
+    }
+
+    fn start_bridge(&self, bridge: Option<&BridgeLaunch>) -> Result<(), String> {
+        let Some(launch) = bridge else {
+            return Ok(());
+        };
+        let binary = crate::core_assets::xray_path();
+        ensure_executable(&binary);
+        let bridge = XrayBridge::start(&binary, launch, self.log.clone(), LOG_LIMIT)?;
+        let _ = std::fs::write(paths::data_dir().join(XRAY_PID_FILE), bridge.pid().to_string());
+        *self.bridge.lock() = Some(bridge);
+        Ok(())
+    }
+
+    fn start_core(&self, binary: &std::path::Path, config_json: &str, needs_tun: bool) -> Result<(), String> {
 
         if needs_tun && !privileges::process_elevated() {
             #[cfg(windows)]
             {
-                let session = elevated::start(&binary, config_json)?;
+                let session = elevated::start(binary, config_json)?;
                 *self.running.lock() = Some(Running::Elevated(session));
                 return self.wait_startup(Duration::from_millis(1500));
             }
             #[cfg(not(windows))]
-            privileges::ensure_tun_capability(&binary)?;
+            privileges::ensure_tun_capability(binary)?;
         }
 
-        let child = self.spawn_direct(&binary, config_json)?;
+        let child = self.spawn_direct(binary, config_json)?;
         let _ = std::fs::write(paths::data_dir().join(PID_FILE), child.id().to_string());
         *self.running.lock() = Some(Running::Direct(child));
         self.wait_startup(Duration::from_millis(800))
@@ -101,7 +133,6 @@ impl Core {
             return Ok(());
         }
         let tail = self.last_errors();
-        self.stop();
         Err(if tail.is_empty() {
             "Ядро VPN завершилось при запуске".into()
         } else {
@@ -120,9 +151,16 @@ impl Core {
             None => {}
         }
         let _ = std::fs::remove_file(paths::data_dir().join(PID_FILE));
+        *self.bridge.lock() = None;
+        let _ = std::fs::remove_file(paths::data_dir().join(XRAY_PID_FILE));
     }
 
     pub fn is_running(&self) -> bool {
+        if let Some(bridge) = self.bridge.lock().as_mut() {
+            if !bridge.is_running() {
+                return false;
+            }
+        }
         let mut guard = self.running.lock();
         match guard.as_mut() {
             Some(Running::Direct(child)) => matches!(child.try_wait(), Ok(None)),
@@ -161,36 +199,36 @@ impl Drop for Core {
     }
 }
 
-fn kill_orphan() {
-    let path = paths::data_dir().join(PID_FILE);
+fn kill_orphan(pid_file: &str, image: &str) {
+    let path = paths::data_dir().join(pid_file);
     let Ok(pid) = std::fs::read_to_string(&path) else {
         return;
     };
     let pid = pid.trim();
     if pid.parse::<u32>().is_ok() {
-        kill_pid(pid);
+        kill_pid(pid, image);
     }
     let _ = std::fs::remove_file(&path);
 }
 
 #[cfg(windows)]
-fn kill_pid(pid: &str) {
+fn kill_pid(pid: &str, image: &str) {
     let mut command = Command::new(paths::system32("taskkill.exe"));
     command.args([
         "/F",
         "/FI",
         &format!("PID eq {pid}"),
         "/FI",
-        "IMAGENAME eq prime-vpn-core.exe",
+        &format!("IMAGENAME eq {image}"),
     ]);
     hide_window(&mut command);
     let _ = command.stdout(Stdio::null()).stderr(Stdio::null()).status();
 }
 
 #[cfg(not(windows))]
-fn kill_pid(pid: &str) {
+fn kill_pid(pid: &str, image: &str) {
     let comm = std::fs::read_to_string(format!("/proc/{pid}/comm")).unwrap_or_default();
-    if comm.trim().starts_with("prime-vpn-core") {
+    if comm.trim().starts_with(image) {
         let _ = Command::new("kill").arg(pid).status();
     }
 }
@@ -211,14 +249,14 @@ fn ensure_executable(path: &std::path::Path) {
 fn ensure_executable(_path: &std::path::Path) {}
 
 #[cfg(windows)]
-fn hide_window(command: &mut Command) {
+pub fn hide_window(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     command.creation_flags(CREATE_NO_WINDOW);
 }
 
 #[cfg(not(windows))]
-fn hide_window(_command: &mut Command) {}
+pub fn hide_window(_command: &mut Command) {}
 
 #[cfg(windows)]
 mod elevated {

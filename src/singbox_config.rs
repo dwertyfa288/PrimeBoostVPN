@@ -10,6 +10,12 @@ pub struct CoreOptions {
     pub api_secret: String,
     pub settings: VpnSettings,
     pub capture: CaptureMode,
+    pub bridge: Option<Bridge>,
+}
+
+pub struct Bridge {
+    pub port: u16,
+    pub server_addresses: Vec<String>,
 }
 
 const PROXY_TAG: &str = "proxy";
@@ -19,7 +25,7 @@ const TUN_IN: &str = "tun-in";
 const REMOTE_DNS: &str = "remote";
 const DIRECT_DNS: &str = "direct-dns";
 const DIRECT_DNS_SERVER: &str = "77.88.8.8";
-const CORE_PROCESS_NAMES: [&str; 2] = ["prime-vpn-core", "prime-vpn-core-linux"];
+const CORE_PROCESS_NAMES: [&str; 3] = ["prime-vpn-core", "prime-vpn-core-linux", "prime-vpn-xray"];
 const LAN_CIDRS: [&str; 7] = [
     "127.0.0.0/8",
     "169.254.0.0/16",
@@ -79,7 +85,7 @@ pub fn build(server: &VlessConfig, options: &CoreOptions) -> Value {
         "dns": dns(settings, capture),
         "inbounds": inbounds(options),
         "outbounds": [
-            vless_outbound(server),
+            proxy_outbound(server, options.bridge.as_ref()),
             { "type": "direct", "tag": DIRECT_TAG },
             { "type": "block", "tag": "block" }
         ],
@@ -205,6 +211,9 @@ fn route_rules(server: &VlessConfig, options: &CoreOptions, routing: Routing) ->
     }
 
     rules.push(server_direct_rule(&server.address));
+    if let Some(bridge) = &options.bridge {
+        rules.extend(bridge.server_addresses.iter().map(|address| server_direct_rule(address)));
+    }
     rules.extend(split_rules(settings, tun_inbound));
 
     if capture.full_tun {
@@ -290,6 +299,19 @@ fn server_direct_rule(address: &str) -> Value {
     }
 }
 
+fn proxy_outbound(server: &VlessConfig, bridge: Option<&Bridge>) -> Value {
+    match bridge {
+        Some(bridge) => json!({
+            "type": "socks",
+            "tag": PROXY_TAG,
+            "server": "127.0.0.1",
+            "server_port": bridge.port,
+            "version": "5",
+        }),
+        None => vless_outbound(server),
+    }
+}
+
 fn vless_outbound(server: &VlessConfig) -> Value {
     let mut outbound = json!({
         "type": "vless",
@@ -319,6 +341,9 @@ fn tls(server: &VlessConfig) -> Option<Value> {
         "server_name": if server.sni.is_empty() { &server.address } else { &server.sni },
         "utls": { "enabled": true, "fingerprint": server.fingerprint },
     });
+    if server.allow_insecure {
+        tls["insecure"] = json!(true);
+    }
     if !server.alpn.is_empty() {
         tls["alpn"] = json!(server.alpn);
     }
@@ -339,7 +364,18 @@ fn transport(server: &VlessConfig) -> Option<Value> {
             if !server.host.is_empty() {
                 ws["headers"] = json!({ "Host": server.host });
             }
+            if server.ws_early_data > 0 {
+                ws["max_early_data"] = json!(server.ws_early_data);
+                ws["early_data_header_name"] = json!("Sec-WebSocket-Protocol");
+            }
             Some(ws)
+        }
+        "httpupgrade" => {
+            let mut upgrade = json!({ "type": "httpupgrade", "path": server.path });
+            if !server.host.is_empty() {
+                upgrade["host"] = json!(server.host);
+            }
+            Some(upgrade)
         }
         "grpc" => Some(json!({ "type": "grpc", "service_name": server.service_name })),
         "http" => {
@@ -372,6 +408,7 @@ mod tests {
             api_secret: "secret".into(),
             capture: split::resolve_capture(&settings),
             settings,
+            bridge: None,
         }
     }
 
@@ -396,9 +433,9 @@ mod tests {
     #[test]
     fn config_passes_core_check() {
         let binary = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(if cfg!(windows) {
-            "bin/prime-vpn-core.exe"
+            "core/windows/prime-vpn-core.exe"
         } else {
-            "bin/prime-vpn-core-linux"
+            "core/linux/prime-vpn-core"
         });
         if !binary.exists() {
             return;
@@ -409,7 +446,7 @@ mod tests {
             let output = std::process::Command::new(&binary)
                 .args(["check", "-c"])
                 .arg(&path)
-                .current_dir(binary.parent().unwrap())
+                .current_dir(binary.parent().unwrap().parent().unwrap())
                 .output()
                 .unwrap();
             let _ = std::fs::remove_file(&path);

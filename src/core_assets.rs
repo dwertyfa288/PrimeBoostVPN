@@ -9,11 +9,19 @@ use crate::paths;
 const CORE_NAME: &str = "prime-vpn-core.exe";
 #[cfg(windows)]
 const CORE: &[u8] = include_bytes!("../core/windows/prime-vpn-core.exe");
+#[cfg(windows)]
+const XRAY_NAME: &str = "prime-vpn-xray.exe";
+#[cfg(windows)]
+const XRAY: &[u8] = include_bytes!("../core/windows/prime-vpn-xray.exe");
 
 #[cfg(not(windows))]
 const CORE_NAME: &str = "prime-vpn-core";
 #[cfg(not(windows))]
 const CORE: &[u8] = include_bytes!("../core/linux/prime-vpn-core");
+#[cfg(not(windows))]
+const XRAY_NAME: &str = "prime-vpn-xray";
+#[cfg(not(windows))]
+const XRAY: &[u8] = include_bytes!("../core/linux/prime-vpn-xray");
 
 #[cfg(windows)]
 const PLATFORM_FILES: &[(&str, &[u8])] = &[("wintun.dll", include_bytes!("../core/wintun.dll"))];
@@ -50,6 +58,10 @@ fn place(path: &Path, bytes: &[u8]) -> Result<(), String> {
     })
 }
 
+pub fn xray_path() -> PathBuf {
+    paths::core_dir().join(XRAY_NAME)
+}
+
 pub fn ensure() -> Result<PathBuf, String> {
     if let Some(path) = READY.get() {
         return Ok(path.clone());
@@ -57,6 +69,7 @@ pub fn ensure() -> Result<PathBuf, String> {
     let dir = paths::core_dir();
     let core = dir.join(CORE_NAME);
     place(&core, CORE)?;
+    place(&dir.join(XRAY_NAME), XRAY)?;
     for (name, bytes) in PLATFORM_FILES.iter().chain(RULES) {
         place(&dir.join(name), bytes)?;
     }

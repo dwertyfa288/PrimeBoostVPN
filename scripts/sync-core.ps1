@@ -9,6 +9,9 @@ New-Item -ItemType Directory -Force (Join-Path $core "rules"), (Join-Path $core 
 
 Copy-Item (Join-Path $Source "sing-box-x86_64-pc-windows-msvc.exe") (Join-Path $core "windows\prime-vpn-core.exe") -Force
 Copy-Item (Join-Path $Source "roxyboost-core-x86_64-unknown-linux-gnu") (Join-Path $core "linux\prime-vpn-core") -Force
+Copy-Item (Join-Path $Source "primeboost-xray.exe") (Join-Path $core "windows\prime-vpn-xray.exe") -Force
+Copy-Item (Join-Path $Source "primeboost-xray") (Join-Path $core "linux\prime-vpn-xray") -Force
+Copy-Item (Join-Path $Source "LICENSE-xray.txt") $core -Force
 Copy-Item (Join-Path $Source "rules\*.srs") (Join-Path $core "rules") -Force
 Copy-Item (Join-Path $Source "wintun.dll") $core -Force
 Copy-Item (Join-Path $Source "LICENSE-sing-box.txt") $core -Force

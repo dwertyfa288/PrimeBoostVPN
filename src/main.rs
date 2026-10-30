@@ -23,6 +23,7 @@ mod system_proxy;
 mod trial;
 mod vless;
 mod vpn;
+mod xray;
 
 use std::sync::Arc;
 

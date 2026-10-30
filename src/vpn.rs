@@ -6,14 +6,19 @@ use crate::app::SharedApp;
 use crate::auth;
 use crate::locations::{LOCATIONS, Location};
 use crate::settings::{self, VpnSettings};
-use crate::singbox_config::{self, CoreOptions};
+use crate::singbox_config::{self, Bridge, CoreOptions};
 use crate::split;
 use crate::state::{ActiveLocation, Subscription, Traffic, VpnStatus};
 use crate::system_proxy;
 use crate::vless::{self, VlessConfig};
+use crate::xray::{self, BridgeLaunch};
 
-const LATENCY_TIMEOUT: Duration = Duration::from_secs(3);
-const PROBE_DEADLINE: Duration = Duration::from_secs(15);
+const RANKING_BUDGET: Duration = Duration::from_secs(3);
+const LATENCY_TIMEOUT: Duration = Duration::from_millis(1500);
+const PROBE_DEADLINE: Duration = Duration::from_secs(4);
+const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+const PROBE_RETRY: Duration = Duration::from_millis(300);
+const RESOLVE_TIMEOUT: Duration = Duration::from_secs(8);
 const PROBE_URLS: [&str; 2] = [
     "https://connectivitycheck.gstatic.com/generate_204",
     "https://cp.cloudflare.com/generate_204",
@@ -124,7 +129,9 @@ async fn rank_candidates(app: &SharedApp, token: &str) -> Result<Vec<Candidate>,
     let lookups = LOCATIONS.iter().map(|location| {
         let token = token.to_owned();
         async move {
-            let key = api::fetch_key(&token, location.id).await;
+            let key = tokio::time::timeout(RANKING_BUDGET, api::fetch_key(&token, location.id))
+                .await
+                .unwrap_or_else(|_| Err(ApiError::Server("Сервер не отвечает".into())));
             let server = match key {
                 Ok(key) => vless::parse(&key).map_err(ApiError::Server),
                 Err(error) => Err(error),
@@ -178,9 +185,8 @@ where
 
 async fn measure_latency(server: &VlessConfig) -> Option<u64> {
     let target = format!("{}:{}", bracket_ipv6(&server.address), server.port);
-    let address = tokio::task::spawn_blocking(move || target.to_socket_addrs().ok()?.next())
-        .await
-        .ok()??;
+    let lookup = tokio::task::spawn_blocking(move || target.to_socket_addrs().ok()?.next());
+    let address = tokio::time::timeout(LATENCY_TIMEOUT, lookup).await.ok()?.ok()??;
     let started = Instant::now();
     tokio::time::timeout(LATENCY_TIMEOUT, tokio::net::TcpStream::connect(address))
         .await
@@ -225,6 +231,19 @@ async fn start_on(app: &SharedApp, flow: u64, server: &VlessConfig) -> Result<()
         api_secret: (0..24).map(|_| fastrand::alphanumeric()).collect(),
         capture,
         settings,
+        bridge: None,
+    };
+    let bridge = if server.requires_xray() {
+        Some(prepare_bridge(server).await?)
+    } else {
+        None
+    };
+    let options = CoreOptions {
+        bridge: bridge.as_ref().map(|launch| Bridge {
+            port: launch.port,
+            server_addresses: launch.server_addresses.clone(),
+        }),
+        ..options
     };
     let config = singbox_config::build(server, &options).to_string();
     if capture.needs_tun() && !crate::privileges::process_elevated() {
@@ -233,7 +252,7 @@ async fn start_on(app: &SharedApp, flow: u64, server: &VlessConfig) -> Result<()
 
     let start_app = app.clone();
     let needs_tun = capture.needs_tun();
-    tokio::task::spawn_blocking(move || start_app.core.start(&config, needs_tun))
+    tokio::task::spawn_blocking(move || start_app.core.start(&config, needs_tun, bridge.as_ref()))
         .await
         .map_err(|error| Failure::Message(error.to_string()))?
         .map_err(Failure::Message)?;
@@ -277,6 +296,16 @@ async fn start_on(app: &SharedApp, flow: u64, server: &VlessConfig) -> Result<()
     Ok(())
 }
 
+async fn prepare_bridge(server: &VlessConfig) -> Result<BridgeLaunch, Failure> {
+    let server = server.clone();
+    let task = tokio::task::spawn_blocking(move || xray::prepare(&server));
+    tokio::time::timeout(RESOLVE_TIMEOUT, task)
+        .await
+        .map_err(|_| Failure::Message("Не удалось найти адрес сервера".into()))?
+        .map_err(|error| Failure::Message(error.to_string()))?
+        .map_err(Failure::Message)
+}
+
 async fn stop_core(app: &SharedApp) {
     let stop_app = app.clone();
     let _ = tokio::task::spawn_blocking(move || {
@@ -291,13 +320,13 @@ async fn probe_until_ready(app: &SharedApp, flow: u64, port: u16) -> Result<(), 
         .map_err(|error| Failure::Message(error.to_string()))?;
     let client = reqwest::Client::builder()
         .proxy(proxy)
-        .connect_timeout(Duration::from_secs(4))
-        .timeout(Duration::from_secs(5))
+        .connect_timeout(PROBE_TIMEOUT)
+        .timeout(PROBE_TIMEOUT)
         .build()
         .map_err(|error| Failure::Message(error.to_string()))?;
 
     let deadline = Instant::now() + PROBE_DEADLINE;
-    let mut last_error = String::from("Сервер не отвечает");
+    let mut last_error = String::from("Сервер не отвечает или ключ не работает");
     while Instant::now() < deadline {
         is_current(app, flow)?;
         if !app.core.is_running() {
@@ -308,14 +337,25 @@ async fn probe_until_ready(app: &SharedApp, flow: u64, port: u16) -> Result<(), 
                 format!("Ядро VPN остановилось: {details}")
             }));
         }
+        let mut probes = tokio::task::JoinSet::new();
         for url in PROBE_URLS {
-            match client.get(url).send().await {
-                Ok(response) if response.status().is_success() => return Ok(()),
-                Ok(response) => last_error = format!("Проверка соединения: {}", response.status()),
-                Err(error) => last_error = format!("Проверка соединения: {}", error.without_url()),
+            let client = client.clone();
+            probes.spawn(async move {
+                match client.get(url).send().await {
+                    Ok(response) if response.status().is_success() => Ok(()),
+                    Ok(response) => Err(format!("Проверка соединения: {}", response.status())),
+                    Err(error) => Err(format!("Проверка соединения: {}", error.without_url())),
+                }
+            });
+        }
+        while let Some(result) = probes.join_next().await {
+            match result {
+                Ok(Ok(())) => return Ok(()),
+                Ok(Err(error)) => last_error = error,
+                Err(error) => last_error = error.to_string(),
             }
         }
-        tokio::time::sleep(Duration::from_millis(1200)).await;
+        tokio::time::sleep(PROBE_RETRY).await;
     }
     Err(Failure::Message(last_error))
 }
